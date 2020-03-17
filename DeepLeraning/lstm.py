@@ -11,25 +11,25 @@ from pyCompare import blandAltman
 from tensorflow import keras
 import matplotlib.pyplot as plt
 from Utils.SignalUtils import calculateSD, prepareFiringSignal, windowingSig, \
-    calculateCdr, trainTestSplit, calculateNormalizedOnCorr, getSignal2, extractPhaseSpace, butter_bandpass_filter, calculateForceAverage
+    calculateCdr, trainTestSplit, calculateNormalizedOnCorr, getSignal2, extractPhaseSpace, butter_bandpass_filter, calculateForceAverage, getSignal, getSignal3
 from sklearn.metrics import r2_score
 import pandas as pd
 
 maxFeatures = 64
-# sig, force, fs, firings = getSignal(1, 30, "./signals/")
+# sig, force, fs, firings = getSignal(1, 30, "../signals/")
 trainSigs = []
 trainTargets = []
-for i in range(10, 17):
-    sig, force, fs, firings = getSignal2("002041436" + str(i), filePath="../signals/Hamid/00MaHaLI1002041436/")
+for i in range(1, 3):
+    sig, force, fs, firings = getSignal3(str(i))
     trainSigs.append(sig)
     trainTargets.append(force)
-sig2, force2, fs2, firings2 = getSignal2("00204143617", filePath="../signals/Hamid/00MaHaLI1002041436/")
+sig2, force2, fs2, firings2 = getSignal3(str(3))
 
 
 # sig2, force2, fs2, firings2 = getSignal(2, 30, "./signals/")
 def prepareDataWithForce(sig, force):
     sdSig = calculateSD(sig)
-    sdSig = butter_bandpass_filter(sdSig, 20, 450, 2048)
+    sdSig = butter_bandpass_filter(sdSig, 20, 450, fs2)
     # sdSig = calculateICA(sdSig, 64)
 
     signalWindow, labelWindow = windowingSig(sdSig, force, windowSize=maxFeatures)  # should be divideable to 4
@@ -134,7 +134,7 @@ reduce_lr_acc = ReduceLROnPlateau(monitor='val_loss', factor=0.9, patience=epoch
 model.fit(X_train, Y_train,
           epochs=epochs,
           batch_size=batch_size, validation_data=(X_test, Y_test), callbacks=[reduce_lr_acc])
-
+model.save("ForceEstimation.h5", overwrite=True)
 # acc = model.evaluate(X_test,
 #                      Y_test,
 #                      batch_size=batch_size,
@@ -158,9 +158,19 @@ plt.plot(predicted2)
 plt.legend(['Target', 'Estimated'], loc='upper left')
 plt.show()
 
+
+out = model.predict(signalWindow2, batch_size=batch_size)
+rect_predict = out.ravel()
+plt.plot(labelWindow2)
+plt.plot(rect_predict)
+plt.legend(['Target', 'Estimated'], loc='upper left')
+plt.show()
+
 blandAltman(Y_test, predicted,
             savePath='SavedFigureAltman.svg',
             figureFormat='svg')
+
+
 
 df=pd.DataFrame(columns=["target","predicted"])
 df["predicted"]=predicted2

@@ -1,5 +1,7 @@
 from unittest import TestCase
 
+from sklearn.preprocessing import scale
+
 from DeepLeraning.CycleGAN import CycleGAN
 
 from Utils.SignalUtils import getSignal2, calculateSD, butter_bandpass_filter, prepareFiringSignal, windowingSig, calculateCdr, extractPhaseSpace, trainTestSplit, calculateICA
@@ -10,6 +12,8 @@ class TestCycleGAN(TestCase):
 
     def prepareData(self, sig, firings):
         sdSig = calculateSD(sig)
+        sdSig = scale(sdSig, axis=1)
+
         # sdSig = calculateICA(sdSig, 64)
         sdSig = butter_bandpass_filter(sdSig, 20, 450, 2048)
         sizeInputSignal = sdSig.shape[1]
@@ -48,5 +52,14 @@ class TestCycleGAN(TestCase):
         X_train, X_test, Y_train, Y_test = trainTestSplit(signalWindow, labelWindow, 0.75)
         X_train2, X_test2, Y_train2, Y_test2 = trainTestSplit(signalWindow2, labelWindow2, 0.75)
 
-        cycleGAN = CycleGAN(X_train.shape[1], X_train.shape[2])
-        cycleGAN.train(x_train=X_train,y_train=Y_train,epochs=100)
+        X_train = np.reshape(X_train, [-1, X_train.shape[1], X_train.shape[2], 1])
+        # X_test = np.reshape(X_test, [-1, X_test.shape[1], X_test.shape[2], 1])
+        Y_train = np.reshape(Y_train, [-1, Y_train.shape[1], Y_train.shape[2], 1])
+        # y_test = np.reshape(Y_test, [-1, Y_test.shape[1], Y_test.shape[2], 1])
+
+
+        # Y_train = (Y_train - np.min(Y_train)) / (np.max(Y_train) - np.min(Y_train))
+        # X_train = (X_train - np.min(X_train)) / (np.max(X_train) - np.min(X_train))
+
+        cycleGAN = CycleGAN(Y_train.shape[1], Y_train.shape[2])
+        cycleGAN.train(x_train=X_train[:, :, range(Y_train.shape[2]), :], y_train=Y_train, epochs=100)

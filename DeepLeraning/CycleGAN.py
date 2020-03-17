@@ -5,15 +5,16 @@ import os
 
 import matplotlib.pyplot as plt
 import numpy as np
-from keras.layers import Input, Dropout, Concatenate
+from keras.layers import Input, Dropout, Concatenate, Lambda
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers.convolutional import UpSampling2D, Conv2D
 from keras.models import Model
 from keras.optimizers import Adam
 from keras_contrib.layers.normalization.instancenormalization import InstanceNormalization
+import tensorflow as tf
 
 
-class CycleGAN():
+class CycleGAN:
     def __init__(self, row, col):
         # Input shape
         self.img_rows = row
@@ -22,15 +23,15 @@ class CycleGAN():
         self.img_shape = (self.img_rows, self.img_cols, self.channels)
 
         # Configure data loader
-        self.dataset_name = 'Motion2NoMotion'
+        self.dataset_name = 'EMG2Spikes'
 
         # Calculate output shape of D (PatchGAN)
         patch = int(self.img_rows / 2 ** 4)
-        self.disc_patch = (patch, patch, 1)
+        self.disc_patch = (patch, 1, 1)
 
         # Number of filters in the first layer of G and D
-        self.gf = 32
-        self.df = 64
+        self.gf = 6
+        self.df = 12
 
         # Loss weights
         self.lambda_cycle = 10.0  # Cycle-consistency loss
@@ -54,8 +55,8 @@ class CycleGAN():
         # -------------------------
 
         # Build the generators
-        self.g_AB = self.build_generator()
-        self.g_BA = self.build_generator()
+        self.g_AB = self.build_generator("softsign")
+        self.g_BA = self.build_generator("tanh")
 
         # Input images from both domains
         img_A = Input(shape=self.img_shape)
@@ -92,17 +93,22 @@ class CycleGAN():
                                             self.lambda_id, self.lambda_id],
                               optimizer=optimizer)
 
-    def build_generator(self):
+    def build_generator(self, outputLayer="sigmoid"):
         """U-Net Generator"""
 
-        def conv2d(layer_input, filters, f_size=4):
+        def conv2d(layer_input, filters, f_size=3):
             """Layers used during downsampling"""
             d = Conv2D(filters, kernel_size=f_size, strides=2, padding='same')(layer_input)
             d = LeakyReLU(alpha=0.2)(d)
             d = InstanceNormalization()(d)
             return d
 
-        def deconv2d(layer_input, skip_input, filters, f_size=4, dropout_rate=0):
+        def counting(args):
+            input = args
+            var = tf.reduce_sum(input, axis=3, keepdims=True) / tf.reduce_max(input)
+            return var
+
+        def deconv2d(layer_input, skip_input, filters, f_size=3, dropout_rate=0):
             """Layers used during upsampling"""
             u = UpSampling2D(size=2)(layer_input)
             u = Conv2D(filters, kernel_size=f_size, strides=1, padding='same', activation='relu')(u)
@@ -117,17 +123,14 @@ class CycleGAN():
 
         # Downsampling
         d1 = conv2d(d0, self.gf)
-        d2 = conv2d(d1, self.gf * 2)
-        d3 = conv2d(d2, self.gf * 4)
-        d4 = conv2d(d3, self.gf * 8)
+        d2 = conv2d(d1, self.gf * 3)
 
         # Upsampling
-        u1 = deconv2d(d4, d3, self.gf * 4)
-        u2 = deconv2d(u1, d2, self.gf * 2)
-        u3 = deconv2d(u2, d1, self.gf)
+        u3 = deconv2d(d2, d1, self.gf)
 
-        u4 = UpSampling2D(size=2)(u3)
-        output_img = Conv2D(self.channels, kernel_size=4, strides=1, padding='same', activation='tanh')(u4)
+        u4 = UpSampling2D()(u3)
+        u5 = Lambda(counting, name='z')(u4)
+        output_img = Conv2D(self.channels, kernel_size=3, strides=1, padding='same', activation=outputLayer)(u5)
 
         return Model(d0, output_img)
 
@@ -163,8 +166,8 @@ class CycleGAN():
         for epoch in range(epochs):
             for batch_i, imgs_A in enumerate(x_train):
                 imgs_B = y_train[batch_i]
-                imgs_B = np.reshape(imgs_B, (-1, 256, 256, 1)) / 255
-                imgs_A = np.reshape(imgs_A, (-1, 256, 256, 1)) / 255
+                imgs_B = np.reshape(imgs_B, (-1, 256, 12, 1))
+                imgs_A = np.reshape(imgs_A, (-1, 256, 12, 1))
                 # ----------------------
                 #  Train Discriminators
                 # ----------------------
@@ -211,12 +214,12 @@ class CycleGAN():
                 # If at save interval => save generated image samples
                 if batch_i % sample_interval == 0:
                     self.sample_images(epoch, batch_i, imgs_A, imgs_B)
-        self.g_AB.save("NoMotionToMotionModel.h5", overwrite=True)
-        self.g_BA.save("MotionToNoMotionModel.h5", overwrite=True)
+        self.g_AB.save("EMG2Spikes.h5", overwrite=True)
+        self.g_BA.save("Spikes2EMG.h5", overwrite=True)
 
     def sample_images(self, epoch, batch_i, imgs_A, imgs_B):
         os.makedirs('images/%s' % self.dataset_name, exist_ok=True)
-        r, c = 2, 4
+        r, c = 2, 3
 
         # Demo (for GIF)
         # imgs_A = self.data_loader.load_img('datasets/apple2orange/testA/n07740461_1541.jpg')
@@ -229,22 +232,21 @@ class CycleGAN():
         reconstr_A = self.g_BA.predict(fake_B)
         reconstr_B = self.g_AB.predict(fake_A)
 
-        motionDetection_A = self.g_BA.predict(imgs_A)
-        motionDetection_B = self.g_AB.predict(imgs_B)
-
-        gen_imgs = np.concatenate([imgs_A, fake_B, reconstr_A, motionDetection_B, imgs_B, fake_A, reconstr_B, motionDetection_A])
+        gen_imgs = np.concatenate([imgs_A, fake_B, reconstr_A, imgs_B, fake_A, reconstr_B])
 
         # Rescale images 0 - 1
-        gen_imgs = 0.5 * gen_imgs + 0.5
+        # gen_imgs = 0.5 * gen_imgs + 0.5
 
-        titles = ['Original', 'Translated', 'Reconstructed', "Detection"]
+        titles = ['Original', 'Translated', 'Reconstructed']
         fig, axs = plt.subplots(r, c)
         cnt = 0
         for i in range(r):
             for j in range(c):
-                axs[i, j].imshow(gen_imgs[cnt][:, :, 0], cmap="gray")
+                for bias in range(12):
+                    if i == 0 and j == 1:
+                        gen_imgs[cnt][:, bias, 0] = np.abs(gen_imgs[cnt][:, bias, 0])
+                    axs[i, j].plot(gen_imgs[cnt][:, bias, 0] / np.max(gen_imgs[cnt][:, bias, 0]) + bias)
                 axs[i, j].set_title(titles[j])
-                axs[i, j].axis('off')
                 cnt += 1
         fig.savefig("images/%s/%d_%d.png" % (self.dataset_name, epoch, batch_i))
         plt.close()

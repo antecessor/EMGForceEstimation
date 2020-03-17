@@ -35,6 +35,18 @@ def getSignal2(sign, filePath="signals/Hamid/00MaHaLI1002041436/"):
                 sig = np.delete(sig, 4, axis=0)
                 return sig, force, fs, firings
 
+def getSignal3(sign, filePath="../signals/Hamid2/DataReadyPython/"):
+    if os.path.exists(filePath):
+        signals = os.listdir(filePath)
+        for signal in signals:
+            if signal.__contains__(sign):
+                mat = scipy.io.loadmat(filePath + signal)
+                fs = mat['fs']
+                force = mat['ref_signal']
+                sig = mat['SIG']
+                # sig = np.delete(sig, 4, axis=0)
+                return sig, force, fs, None
+
 
 # calculating the SD signal
 def calculateSD(sig):
@@ -123,7 +135,7 @@ def windowingSig(sig, labels, windowSize=15):
         labelsWindow = [labels[int(i):int(i + windowSize)].transpose() for i in range(0, signalLen - 1, windowSize)]
     else:
         labelsWindow = [labels[:, int(i):int(i + windowSize)].transpose() for i in range(0, signalLen - windowSize, windowSize)]
-    signalsWindow = [sig[:, int(i):int(i + windowSize)] for i in range(0, signalLen - windowSize, windowSize)]
+    signalsWindow = [sig[:, int(i):int(i + windowSize)].transpose() for i in range(0, signalLen - windowSize, windowSize)]
 
     return signalsWindow, labelsWindow
 
