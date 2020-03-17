@@ -159,13 +159,6 @@ plt.legend(['Target', 'Estimated'], loc='upper left')
 plt.show()
 
 
-out = model.predict(signalWindow2, batch_size=batch_size)
-rect_predict = out.ravel()
-plt.plot(labelWindow2)
-plt.plot(rect_predict)
-plt.legend(['Target', 'Estimated'], loc='upper left')
-plt.show()
-
 blandAltman(Y_test, predicted,
             savePath='SavedFigureAltman.svg',
             figureFormat='svg')

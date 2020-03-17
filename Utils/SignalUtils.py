@@ -35,6 +35,7 @@ def getSignal2(sign, filePath="signals/Hamid/00MaHaLI1002041436/"):
                 sig = np.delete(sig, 4, axis=0)
                 return sig, force, fs, firings
 
+
 def getSignal3(sign, filePath="../signals/Hamid2/DataReadyPython/"):
     if os.path.exists(filePath):
         signals = os.listdir(filePath)
@@ -140,8 +141,8 @@ def windowingSig(sig, labels, windowSize=15):
     return signalsWindow, labelsWindow
 
 
-def trainTestSplit(sig, label, trainPercent):
-    X_train, X_test, y_train, y_test = train_test_split(sig, label, train_size=trainPercent, shuffle=True)
+def trainTestSplit(sig, label, trainPercent, shuffle=True):
+    X_train, X_test, y_train, y_test = train_test_split(sig, label, train_size=trainPercent, shuffle=shuffle)
     X_train = np.array(X_train)
     X_test = np.array(X_test)
     y_train = np.array(y_train)
@@ -151,6 +152,7 @@ def trainTestSplit(sig, label, trainPercent):
 
 def calculateCdr(labels):
     return np.array([np.sum(label) for label in labels])
+
 
 def calculateForceAverage(labels):
     return np.array([np.median(label) for label in labels])
