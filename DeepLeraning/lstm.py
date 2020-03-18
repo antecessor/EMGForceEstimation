@@ -105,15 +105,15 @@ def counting(args):
 
 
 model = Sequential()
-model.add(Conv1D(64, 5, padding='same', input_shape=input_shape))
+model.add(Conv1D(32, 5, padding='same', input_shape=input_shape))
 model.add(LeakyReLU(alpha=0.2))
 model.add(BatchNormalization())
-model.add(Activation("relu"))
 model.add(GRU(lstm_out, return_sequences=True))
+# model.add(Activation("sigmoid"))
 # model.add(LSTM(lstm_out))
-# model.add(Lambda(counting,
-#                  name='z'))
-model.add(Flatten())
+model.add(Lambda(counting,
+                 name='z'))
+# model.add(Flatten())
 model.add(Dense(16, activity_regularizer=l2(0.001)))
 # model.add(GRU(lstm_out, return_sequences=True))
 # model.add(LSTM(lstm_out))
@@ -158,15 +158,12 @@ plt.plot(predicted2)
 plt.legend(['Target', 'Estimated'], loc='upper left')
 plt.show()
 
-
 blandAltman(Y_test, predicted,
             savePath='SavedFigureAltman.svg',
             figureFormat='svg')
 
-
-
-df=pd.DataFrame(columns=["target","predicted"])
-df["predicted"]=predicted2
-df["target"]=Y_train2
+df = pd.DataFrame(columns=["target", "predicted"])
+df["predicted"] = predicted2
+df["target"] = Y_train2
 df.to_excel("result.xlsx")
 pass
