@@ -168,7 +168,7 @@ def butter_bandpass(lowcut, highcut, fs, order=5):
 
 def butter_bandpass_filter(data, lowcut, highcut, fs, order=5):
     b, a = butter_bandpass(lowcut, highcut, fs, order=order)
-    y = filtfilt(b, a, data.transpose(), axis=1)
+    y = filtfilt(b, a, data, axis=1)
     return y.transpose()
 
 
