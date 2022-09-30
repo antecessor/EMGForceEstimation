@@ -7,7 +7,7 @@ google-pasta==0.2.0
 grpcio==1.27.2
 h5py==2.10.0
 jdcal==1.4.1
-joblib==0.14.1
+joblib==1.2.0
 Keras==2.3.1
 Keras-Applications==1.0.8
 keras-contrib==2.0.8
